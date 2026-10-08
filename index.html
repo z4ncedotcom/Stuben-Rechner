@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Getränke-Rechner</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap">
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#edf1ef;--card:#fff;--ink:#13242a;--mut:#5f7076;--line:#d5dfdc;--acc:#0e7490;--on:#fff;--soft:#e2f1f4;--bad:#b42318}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1a1d;--card:#17262a;--ink:#e6f0ee;--mut:#8ea3a8;--line:#2a3f44;--acc:#5eead4;--on:#06201c;--soft:#1d3a3d;--bad:#f97066}}
+:root[data-theme="dark"]{--bg:#0f1a1d;--card:#17262a;--ink:#e6f0ee;--mut:#8ea3a8;--line:#2a3f44;--acc:#5eead4;--on:#06201c;--soft:#1d3a3d;--bad:#f97066}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.45 "Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",sans-serif;font-variant-numeric:tabular-nums}
+main{max-width:640px;margin:0 auto;padding:20px 16px 8px}
+h1{font-size:30px;line-height:1.1;font-weight:800;margin:4px 0 4px;letter-spacing:-.02em}
+h2{font-size:18px;font-weight:600;margin:28px 0 10px}
+.mut{color:var(--mut);margin:0}
+.box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px}
+.row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.row:last-child{margin-bottom:0}
+input{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:9px 11px;min-width:0;flex:1}
+input.price{flex:0 0 76px;text-align:right}
+input:focus-visible,button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:9px 14px}
+button.main{background:var(--acc);color:var(--on);border-color:var(--acc);font-weight:600}
+button.x{padding:6px 10px;color:var(--mut);line-height:1}
+.add{margin-top:10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;margin-bottom:12px;overflow:hidden}
+.ph{display:flex;align-items:center;gap:10px;padding:12px;background:var(--soft)}
+.ph strong{flex:1;font-size:18px;overflow-wrap:anywhere}
+.tot{font-weight:800;font-size:20px}
+.dr{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;border-top:1px solid var(--line)}
+.dr small{color:var(--mut)}
+.st{display:flex;align-items:center;gap:6px}
+.st button{width:40px;height:40px;padding:0;font-size:20px}
+.st button.p{background:var(--acc);color:var(--on);border-color:var(--acc)}
+.st b{min-width:28px;text-align:center;font-size:18px}
+table{width:100%;border-collapse:collapse}
+th,td{padding:8px 4px;text-align:left;border-bottom:1px solid var(--line)}
+th:last-child,td:last-child{text-align:right}
+.wrap{overflow-x:auto}
+.bar{position:sticky;bottom:0;margin-top:20px;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));background:var(--acc);color:var(--on)}
+.bar div{max-width:640px;margin:0 auto;display:flex;justify-content:space-between;align-items:baseline}
+.bar span{font-weight:600}.bar b{font-size:28px;font-weight:800}
+.share{margin-top:12px}.share button{flex:1}
+.reset{margin:10px 0 28px;display:flex;justify-content:flex-end}
+</style>
+</head>
+<body>
+<main>
+  <h1>Getränke-Rechner</h1>
+  <p class="mut">Namen eintragen, Getränke antippen, am Ende steht, wer wie viel zahlt.</p>
+
+  <h2>Getränke &amp; Preise</h2>
+  <div class="box">
+    <div id="drinks"></div>
+    <div class="row add">
+      <input id="dn" placeholder="Neues Getränk" autocomplete="off">
+      <input id="dp" class="price" placeholder="Preis" inputmode="decimal" autocomplete="off">
+      <button class="main" data-act="dadd">Hinzufügen</button>
+    </div>
+  </div>
+
+  <h2>Personen</h2>
+  <div class="row">
+    <input id="pn" placeholder="Name eintragen" autocomplete="off">
+    <button class="main" data-act="padd">Hinzufügen</button>
+  </div>
+  <div id="people"></div>
+
+  <h2>Ergebnis</h2>
+  <div class="box wrap" id="result"></div>
+  <div class="row share"><button class="main" data-act="wa">Per WhatsApp senden</button><button data-act="copy">Text kopieren</button></div>
+  <div class="reset"><button id="reset" data-act="reset">Alle Mengen zurücksetzen</button></div>
+</main>
+<div class="bar"><div><span>Gesamt</span><b id="sum">0,00 €</b></div></div>
+
+<script>
+const KEY = 'getraenke-rechner-v1';
+let S = {
+  people: [],
+  drinks: [
+    {id: 'd1', name: 'Wasser', price: 2.5},
+    {id: 'd2', name: 'Cola', price: 3},
+    {id: 'd3', name: 'Bier', price: 3.5},
+    {id: 'd4', name: 'Cocktail', price: 7}
+  ]
+};
+try { const r = localStorage.getItem(KEY); if (r) S = JSON.parse(r); } catch (e) {}
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
+const uid = () => Math.random().toString(36).slice(2, 9);
+const eur = n => new Intl.NumberFormat('de-DE', {style: 'currency', currency: 'EUR'}).format(n);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+const num = v => { const n = parseFloat(String(v).replace(',', '.')); return isFinite(n) && n >= 0 ? n : 0; };
+const $ = id => document.getElementById(id);
+const cnt = (p, d) => p.counts[d.id] || 0;
+const pTotal = p => S.drinks.reduce((a, d) => a + cnt(p, d) * d.price, 0);
+const pCount = p => S.drinks.reduce((a, d) => a + cnt(p, d), 0);
+let armed = false;
+
+function render() {
+  $('drinks').innerHTML = S.drinks.map(d =>
+    `<div class="row"><input data-act="dname" data-id="${d.id}" value="${esc(d.name)}" aria-label="Getränk">` +
+    `<input class="price" data-act="dprice" data-id="${d.id}" value="${String(d.price).replace('.', ',')}" inputmode="decimal" aria-label="Preis in Euro">` +
+    `<button class="x" data-act="ddel" data-id="${d.id}" aria-label="${esc(d.name)} löschen">×</button></div>`
+  ).join('') || '<p class="mut">Noch keine Getränke. Füge unten eins hinzu.</p>';
+
+  $('people').innerHTML = S.people.map(p =>
+    `<div class="card"><div class="ph"><strong>${esc(p.name)}</strong><span class="tot">${eur(pTotal(p))}</span>` +
+    `<button class="x" data-act="pdel" data-id="${p.id}" aria-label="${esc(p.name)} entfernen">×</button></div>` +
+    S.drinks.map(d =>
+      `<div class="dr"><span>${esc(d.name)} <small>${eur(d.price)}</small></span><div class="st">` +
+      `<button data-act="dec" data-p="${p.id}" data-id="${d.id}" aria-label="Eins weniger">−</button><b>${cnt(p, d)}</b>` +
+      `<button class="p" data-act="inc" data-p="${p.id}" data-id="${d.id}" aria-label="Eins mehr">+</button></div></div>`
+    ).join('') + `</div>`
+  ).join('') || '<p class="mut">Noch niemand dabei. Trag oben den ersten Namen ein.</p>';
+
+  const total = S.people.reduce((a, p) => a + pTotal(p), 0);
+  $('sum').textContent = eur(total);
+  const perDrink = S.drinks.map(d => ({d, n: S.people.reduce((a, p) => a + cnt(p, d), 0)})).filter(x => x.n > 0);
+  $('result').innerHTML = S.people.length
+    ? `<table><thead><tr><th>Person</th><th>Getränke</th><th>Betrag</th></tr></thead><tbody>` +
+      S.people.map(p => `<tr><td>${esc(p.name)}</td><td>${pCount(p)}</td><td>${eur(pTotal(p))}</td></tr>`).join('') +
+      `<tr><td><b>Gesamt</b></td><td><b>${S.people.reduce((a, p) => a + pCount(p), 0)}</b></td><td><b>${eur(total)}</b></td></tr></tbody></table>` +
+      (perDrink.length ? `<p class="mut" style="margin-top:10px">${perDrink.map(x => `${x.n}× ${esc(x.d.name)}`).join(', ')}</p>` : '')
+    : '<p class="mut">Das Ergebnis erscheint, sobald Personen und Getränke eingetragen sind.</p>';
+  const rb = $('reset'); rb.textContent = armed ? 'Wirklich alles auf 0 setzen?' : 'Alle Mengen zurücksetzen';
+  rb.style.color = armed ? 'var(--bad)' : '';
+  save();
+}
+
+function addPerson() {
+  const name = $('pn').value.trim();
+  if (!name) { $('pn').focus(); return; }
+  S.people.push({id: uid(), name, counts: {}});
+  $('pn').value = ''; render(); $('pn').focus();
+}
+function addDrink() {
+  const name = $('dn').value.trim();
+  if (!name) { $('dn').focus(); return; }
+  S.drinks.push({id: uid(), name, price: num($('dp').value)});
+  $('dn').value = ''; $('dp').value = ''; render(); $('dn').focus();
+}
+
+function summary() {
+  const lines = S.people.filter(p => pCount(p) > 0).map(p =>
+    `${p.name}: ${S.drinks.filter(d => cnt(p, d) > 0).map(d => `${cnt(p, d)}× ${d.name}`).join(', ')} = ${eur(pTotal(p))}`);
+  return `🍹 Getränke-Abrechnung\n\n${lines.join('\n')}\n\nGesamt: ${eur(S.people.reduce((a, p) => a + pTotal(p), 0))}`;
+}
+function flash(b, t) {
+  const o = b.dataset.o || b.textContent; b.dataset.o = o; b.textContent = t;
+  setTimeout(() => { b.textContent = o; }, 1800);
+}
+function share(a, b) {
+  if (!S.people.some(p => pCount(p) > 0)) return flash(b, 'Noch nichts eingetragen');
+  const t = summary();
+  if (a === 'wa') { window.open('https://wa.me/?text=' + encodeURIComponent(t), '_blank'); return; }
+  try { navigator.clipboard.writeText(t).then(() => flash(b, 'Kopiert ✓'), () => flash(b, 'Kopieren nicht möglich')); }
+  catch (e) { flash(b, 'Kopieren nicht möglich'); }
+}
+
+document.addEventListener('click', e => {
+  const b = e.target.closest('button[data-act]'); if (!b) return;
+  const a = b.dataset.act, id = b.dataset.id, p = S.people.find(x => x.id === b.dataset.p);
+  if (a === 'wa' || a === 'copy') return share(a, b);
+  if (a !== 'reset') armed = false;
+  if (a === 'padd') return addPerson();
+  if (a === 'dadd') return addDrink();
+  if (a === 'pdel') S.people = S.people.filter(x => x.id !== id);
+  if (a === 'ddel') S.drinks = S.drinks.filter(x => x.id !== id);
+  if (a === 'inc' && p) p.counts[id] = (p.counts[id] || 0) + 1;
+  if (a === 'dec' && p) p.counts[id] = Math.max(0, (p.counts[id] || 0) - 1);
+  if (a === 'reset') {
+    if (!armed) { armed = true; return render(); }
+    S.people.forEach(x => x.counts = {}); armed = false;
+  }
+  render();
+});
+document.addEventListener('change', e => {
+  const t = e.target, d = S.drinks.find(x => x.id === t.dataset.id); if (!d) return;
+  if (t.dataset.act === 'dname') d.name = t.value.trim() || d.name;
+  if (t.dataset.act === 'dprice') d.price = num(t.value);
+  render();
+});
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  if (e.target.id === 'pn') addPerson();
+  if (e.target.id === 'dn' || e.target.id === 'dp') addDrink();
+});
+render();
+</script>
+</body>
+</html>
